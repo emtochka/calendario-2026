@@ -171,7 +171,7 @@
 
             const handleDayClick = (dateString) => {
                 const current = availability[dateString] || 'neutral';
-                const next = current === 'neutral' ? 'available' : current === 'available' ? 'unavailable' : 'neutral';
+                const next = current === 'neutral' ? 'unavailable' : current === 'unavailable' ? 'available' : 'neutral';
                 
                 setAvailability(prev => ({
                     ...prev,
@@ -388,7 +388,7 @@
                                 <div className="flex flex-wrap gap-4">
                                     <div className="flex items-center">
                                         <div className="w-6 h-6 bg-green-500 rounded mr-2"></div>
-                                        <span className="text-sm">Disponible (preferente)</span>
+                                        <span className="text-sm">Preferente</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="w-6 h-6 bg-red-500 rounded mr-2"></div>
@@ -420,7 +420,7 @@
 
                         <div className="text-center text-sm text-gray-600">
                             <p>Clica en cada día para marcar tu disponibilidad</p>
-                            <p className="mt-1">🟢 Disponible → 🔴 No disponible → ⚪ Sin preferencia</p>
+                            <p className="mt-1"> 🔴 No disponible → 🟢 Preferente →⚪ Sin preferencia</p>
                         </div>
                     </div>
                 </div>
