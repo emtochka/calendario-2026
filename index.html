@@ -39,7 +39,7 @@
             ];
 
             useEffect(() => {
-                if (SCRIPT_URL && SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwAf_qAKeGVlEZ3zuOL9CTmGpQDJ3oc9IxCH5CLRdNeSsPOmz6zw-gNtCIaC3UFjbKSIg/exec") {
+            if (SCRIPT_URL && SCRIPT_URL.includes("script.google.com")) {
                     setSheetConfigured(true);
                     testConnection();
                 }
