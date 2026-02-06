@@ -16,7 +16,7 @@
         const { useState, useEffect } = React;
 
         // ¡¡¡IMPORTANTE!!! CONFIGURA TU URL AQUÍ
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwGu5qN2FilZa2uf3U7_wLyLBh4KMY15gB_FhIz1C0511WlGUeXLcDu0vR7qmVgkZcVFg/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKu9Gf0OATChkaJQi-pw6ivD5GqLy2O4AU-42brl9jUDj49nbjY-WRzbwCx0r08diyCw/exec';
 
         const CalendarioDisponibilidad = () => {
             const [currentMonth, setCurrentMonth] = useState(0);
@@ -39,7 +39,7 @@
             ];
 
             useEffect(() => {
-                if (SCRIPT_URL && SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbwGu5qN2FilZa2uf3U7_wLyLBh4KMY15gB_FhIz1C0511WlGUeXLcDu0vR7qmVgkZcVFg/exec') {
+                if (SCRIPT_URL && SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbxKu9Gf0OATChkaJQi-pw6ivD5GqLy2O4AU-42brl9jUDj49nbjY-WRzbwCx0r08diyCw/exec') {
                     setSheetConfigured(true);
                     testConnection();
                 }
