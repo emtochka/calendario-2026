@@ -15,22 +15,20 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ¡¡¡IMPORTANTE!!! CONFIGURA TU URL AQUÍ
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAf_qAKeGVlEZ3zuOL9CTmGpQDJ3oc9IxCH5CLRdNeSsPOmz6zw-gNtCIaC3UFjbKSIg/exec";
+        // ¡¡¡ATENCIÓN!!! - REEMPLAZA CON TU URL DE GOOGLE APPS SCRIPT
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfOkom7A3--KjMNXKJBo00GyDDNLZEvAIr1KK4dhF9irVigrtW-832wa50uQZCP0LXig/exec';
 
         const CalendarioDisponibilidad = () => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [userCode, setUserCode] = useState('');
+            const [codeInput, setCodeInput] = useState('');
+            const [loginError, setLoginError] = useState('');
             const [currentMonth, setCurrentMonth] = useState(0);
             const [personName, setPersonName] = useState('');
-            const [isAdmin, setIsAdmin] = useState(false);
-            const [code, setCode] = useState('');
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [allUsers, setAllUsers] = useState([]);
             const [availability, setAvailability] = useState({});
             const [loading, setLoading] = useState(false);
-            const [message, setMessage] = useState('');
-            const [sheetConfigured, setSheetConfigured] = useState(false);
-            const [personList, setPersonList] = useState([]);
-            const [selectedUser, setSelectedUser] = useState('');
-            const [useDropdown, setUseDropdown] = useState(true);
 
             const months = [
                 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -38,117 +36,25 @@
                 'Enero 2027'
             ];
 
+            // Verificar autenticación guardada al cargar
             useEffect(() => {
-            if (SCRIPT_URL && SCRIPT_URL.includes("script.google.com")) {
-                    setSheetConfigured(true);
-                    testConnection();
+                const savedCode = localStorage.getItem('userCode');
+                const savedName = localStorage.getItem('userName');
+                const savedIsAdmin = localStorage.getItem('isAdmin') === 'true';
+                
+                if (savedCode && savedName) {
+                    setUserCode(savedCode);
+                    setPersonName(savedName);
+                    setIsAdmin(savedIsAdmin);
+                    setIsAuthenticated(true);
+                    
+                    if (savedIsAdmin) {
+                        loadAllUsers();
+                    } else {
+                        loadPersonData(savedName);
+                    }
                 }
             }, []);
-
-            useEffect(() => {
-                if (isAuthenticated && personName) {
-                    loadData();
-                }
-            }, [isAuthenticated, personName]);
-
-            useEffect(() => {
-                if (isAuthenticated && isAdmin) {
-                    loadAllUsers();
-                }
-            }, [isAuthenticated, isAdmin]);
-
-            const testConnection = async () => {
-                try {
-                    const response = await fetch(`${SCRIPT_URL}?action=test`);
-                    const data = await response.json();
-                    if (data.success) {
-                        console.log('✅ Conexión exitosa con Google Sheets');
-                    }
-                } catch (error) {
-                    console.error('❌ Error de conexión:', error);
-                }
-            };
-
-            const loadAllUsers = async () => {
-                try {
-                    const response = await fetch(`${SCRIPT_URL}?action=getAllUsers`);
-                    const data = await response.json();
-                    if (data.success && Array.isArray(data.data)) {
-                        setPersonList(data.data);
-                    }
-                } catch (error) {
-                    console.error('Error cargando usuarios:', error);
-                }
-            };
-
-            const handleLogin = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-                setMessage('');
-
-                try {
-                    const response = await fetch(`${SCRIPT_URL}?action=validateCode&code=${encodeURIComponent(code)}`);
-                    const data = await response.json();
-
-                    if (data.success) {
-                        setPersonName(data.data.name);
-                        setIsAdmin(data.data.isAdmin || false);
-                        setIsAuthenticated(true);
-                        setMessage(`¡Bienvenid@ ${data.data.name}!`);
-                    } else {
-                        setMessage('Código no válido');
-                    }
-                } catch (error) {
-                    console.error('Error en login:', error);
-                    setMessage('Error de conexión');
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            const loadData = async () => {
-                setLoading(true);
-                try {
-                    const nameToLoad = isAdmin && selectedUser ? selectedUser : personName;
-                    const response = await fetch(`${SCRIPT_URL}?action=getData&name=${encodeURIComponent(nameToLoad)}`);
-                    const data = await response.json();
-
-                    if (data.success) {
-                        setAvailability(data.data || {});
-                        console.log('✅ Datos cargados');
-                    }
-                } catch (error) {
-                    console.error('Error cargando datos:', error);
-                    setMessage('Error al cargar datos');
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            const saveData = async () => {
-                setLoading(true);
-                setMessage('');
-
-                try {
-                    const nameToSave = isAdmin && selectedUser ? selectedUser : personName;
-                    const url = `${SCRIPT_URL}?action=saveData&name=${encodeURIComponent(nameToSave)}&data=${encodeURIComponent(JSON.stringify(availability))}`;
-                    
-                    const response = await fetch(url);
-                    const data = await response.json();
-
-                    if (data.success) {
-                        setMessage('✅ Datos guardados correctamente');
-                        setTimeout(() => setMessage(''), 3000);
-                    } else {
-                        setMessage('Error al guardar: ' + data.message);
-                    }
-                } catch (error) {
-                    console.error('Error guardando datos:', error);
-                    setMessage('Error de conexión al guardar');
-                } finally {
-                    setLoading(false);
-                }
-            };
 
             const getDaysInMonth = (month) => {
                 const year = month === 12 ? 2027 : 2026;
@@ -159,8 +65,8 @@
             const getFirstDayOfMonth = (month) => {
                 const year = month === 12 ? 2027 : 2026;
                 const actualMonth = month === 12 ? 0 : month;
-                const day = new Date(year, actualMonth, 1).getDay();
-                return day === 0 ? 6 : day - 1;
+                const firstDay = new Date(year, actualMonth, 1).getDay();
+                return firstDay === 0 ? 6 : firstDay - 1;
             };
 
             const getDateString = (month, day) => {
@@ -170,20 +76,215 @@
             };
 
             const handleDayClick = (dateString) => {
-                const current = availability[dateString] || 'neutral';
-                const next = current === 'neutral' ? 'unavailable' : current === 'unavailable' ? 'available' : 'neutral';
-                
-                setAvailability(prev => ({
-                    ...prev,
-                    [dateString]: next
-                }));
+                setAvailability(prev => {
+                    const current = prev[dateString] || 'neutral';
+                    const next = current === 'neutral' ? 'unavailable' : 
+                                 current === 'unavailable' ? 'available' : 'neutral';
+                    
+                    if (next === 'neutral') {
+                        const newAvail = { ...prev };
+                        delete newAvail[dateString];
+                        return newAvail;
+                    }
+                    
+                    return { ...prev, [dateString]: next };
+                });
             };
 
             const getDayColor = (dateString) => {
                 const status = availability[dateString] || 'neutral';
-                if (status === 'available') return 'bg-green-500 text-white hover:bg-green-600';
-                if (status === 'unavailable') return 'bg-red-500 text-white hover:bg-red-600';
+                if (status === 'available') return 'bg-green-500 text-white';
+                if (status === 'unavailable') return 'bg-red-500 text-white';
                 return 'bg-gray-100 hover:bg-gray-200';
+            };
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setLoginError('');
+
+                try {
+                    const response = await fetch(`${SCRIPT_URL}?action=validateCode&code=${encodeURIComponent(codeInput)}`);
+                    const result = await response.json();
+
+                    if (result.success && result.data) {
+                        // Autenticación exitosa
+                        const userName = result.data.name;
+                        const adminMode = result.data.isAdmin || false;
+                        
+                        setUserCode(codeInput);
+                        setPersonName(userName);
+                        setIsAdmin(adminMode);
+                        localStorage.setItem('userCode', codeInput);
+                        localStorage.setItem('userName', userName);
+                        localStorage.setItem('isAdmin', adminMode.toString());
+                        setIsAuthenticated(true);
+                        
+                        // Si es admin, cargar lista de usuarios; si no, cargar sus datos
+                        if (adminMode) {
+                            await loadAllUsers();
+                        } else {
+                            await loadPersonData(userName);
+                        }
+                    } else {
+                        setLoginError('Código incorrecto. Por favor, verifica tu código de acceso.');
+                        setCodeInput('');
+                    }
+                } catch (error) {
+                    console.error('Error al autenticar:', error);
+                    setLoginError('Error al conectar con el servidor. Por favor, intenta de nuevo.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleLogout = () => {
+                localStorage.removeItem('userCode');
+                localStorage.removeItem('userName');
+                localStorage.removeItem('isAdmin');
+                setIsAuthenticated(false);
+                setIsAdmin(false);
+                setUserCode('');
+                setPersonName('');
+                setAllUsers([]);
+                setAvailability({});
+                setCodeInput('');
+            };
+
+            const loadAllUsers = async () => {
+                setLoading(true);
+                try {
+                    console.log('👥 Cargando lista de usuarios...');
+                    const response = await fetch(`${SCRIPT_URL}?action=getAllUsers`);
+                    const result = await response.json();
+                    
+                    console.log('📊 Usuarios recibidos:', result);
+                    
+                    if (result.success && result.data) {
+                        setAllUsers(result.data);
+                        // Cargar el primer usuario por defecto
+                        if (result.data.length > 0) {
+                            const firstUser = result.data[0];
+                            setPersonName(firstUser);
+                            await loadPersonData(firstUser);
+                        }
+                    } else {
+                        setAllUsers([]);
+                    }
+                } catch (error) {
+                    console.error('❌ Error al cargar usuarios:', error);
+                    alert('Error al cargar la lista de usuarios: ' + error.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleAdminUserChange = async (e) => {
+                const selectedUser = e.target.value;
+                setPersonName(selectedUser);
+                if (selectedUser) {
+                    await loadPersonData(selectedUser);
+                } else {
+                    setAvailability({});
+                }
+            };
+
+            const loadPersonData = async (name) => {
+                setLoading(true);
+                try {
+                    console.log('📥 Cargando datos para:', name);
+                    const response = await fetch(`${SCRIPT_URL}?action=getData&name=${encodeURIComponent(name)}`);
+                    const result = await response.json();
+                    
+                    console.log('📊 Datos recibidos:', result);
+                    
+                    if (result.success && result.data) {
+                        setAvailability(result.data);
+                    } else {
+                        setAvailability({});
+                    }
+                } catch (error) {
+                    console.error('❌ Error al cargar datos:', error);
+                    alert('Error al cargar los datos: ' + error.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const savePersonData = async () => {
+                if (!personName) {
+                    alert('Error: No hay usuario identificado');
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    console.log('💾 Guardando datos para:', personName);
+                    console.log('📊 Disponibilidad:', availability);
+
+                    const dataToSend = {
+                        action: 'saveData',
+                        name: personName,
+                        data: availability
+                    };
+
+                    const response = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(dataToSend)
+                    });
+
+                    const result = await response.json();
+                    console.log('✅ Resultado del guardado:', result);
+
+                    if (result.success) {
+                        alert('✅ Datos guardados correctamente');
+                    } else {
+                        throw new Error(result.message || 'Error desconocido al guardar');
+                    }
+                } catch (error) {
+                    console.error('❌ Error al guardar:', error);
+                    alert('Error al guardar los datos: ' + error.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const deletePersonData = async () => {
+                if (!personName) {
+                    alert('Error: No hay usuario identificado');
+                    return;
+                }
+
+                if (!confirm(`¿Estás seguro de que quieres eliminar TODOS tus datos de disponibilidad?`)) {
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    console.log('🗑️ Eliminando datos para:', personName);
+
+                    const response = await fetch(`${SCRIPT_URL}?action=deleteData&name=${encodeURIComponent(personName)}`, {
+                        method: 'POST'
+                    });
+
+                    const result = await response.json();
+                    console.log('✅ Resultado de eliminación:', result);
+
+                    if (result.success) {
+                        setAvailability({});
+                        alert('✅ Todos tus datos han sido eliminados');
+                    } else {
+                        throw new Error(result.message || 'Error al eliminar');
+                    }
+                } catch (error) {
+                    console.error('❌ Error al eliminar:', error);
+                    alert('Error al eliminar los datos: ' + error.message);
+                } finally {
+                    setLoading(false);
+                }
             };
 
             const renderCalendar = () => {
@@ -192,7 +293,9 @@
                 const days = [];
 
                 for (let i = 0; i < firstDay; i++) {
-                    days.push(<div key={`empty-${i}`} className="h-12"></div>);
+                    days.push(
+                        <div key={`empty-${i}`} className="aspect-square"></div>
+                    );
                 }
 
                 for (let day = 1; day <= daysInMonth; day++) {
@@ -201,7 +304,7 @@
                         <button
                             key={day}
                             onClick={() => handleDayClick(dateString)}
-                            className={`h-12 rounded-lg flex items-center justify-center font-medium transition-colors ${getDayColor(dateString)}`}
+                            className={`aspect-square flex items-center justify-center rounded-lg font-semibold text-lg transition-all transform hover:scale-105 ${getDayColor(dateString)}`}
                             disabled={loading}
                         >
                             {day}
@@ -212,140 +315,102 @@
                 return days;
             };
 
+            // Pantalla de login
             if (!isAuthenticated) {
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
-                            <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">
                                 Calendario de Disponibilidad
                             </h1>
+                            <p className="text-gray-600 mb-6 text-center">2026</p>
                             
-                            {!sheetConfigured && (
-                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-                                    <p className="text-sm text-yellow-700">
-                                        <strong>⚠️ Configuración pendiente:</strong> Configura SCRIPT_URL en el HTML
-                                    </p>
-                                </div>
-                            )}
-
                             <form onSubmit={handleLogin} className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Código de acceso
+                                        Introduce tu código de acceso
                                     </label>
                                     <input
                                         type="text"
-                                        value={code}
-                                        onChange={(e) => setCode(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        placeholder="Ingresa tu código"
-                                        required
-                                        disabled={!sheetConfigured}
+                                        value={codeInput}
+                                        onChange={(e) => setCodeInput(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Tu código personal"
+                                        disabled={loading}
+                                        autoFocus
                                     />
                                 </div>
 
+                                {loginError && (
+                                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                                        {loginError}
+                                    </div>
+                                )}
+
                                 <button
                                     type="submit"
-                                    disabled={loading || !sheetConfigured}
-                                    className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                                    disabled={loading || !codeInput.trim()}
+                                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
                                 >
-                                    {loading ? 'Validando...' : 'Ingresar'}
+                                    {loading ? 'Verificando...' : '🔐 Acceder'}
                                 </button>
                             </form>
 
-                            {message && (
-                                <div className={`mt-4 p-3 rounded-lg ${message.includes('válido') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                                    {message}
-                                </div>
-                            )}
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                                <p className="text-sm text-gray-600 text-center">
+                                    Si no tienes código de acceso, contacta con el administrador.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 );
             }
 
+            // Pantalla principal (autenticado)
             return (
                 <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
                     <div className="max-w-4xl mx-auto">
                         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
                             <div className="flex justify-between items-center mb-6">
-                                <h1 className="text-3xl font-bold text-gray-800">
-                                    Calendario de Disponibilidad
-                                </h1>
+                                <div>
+                                    <h1 className="text-3xl font-bold text-gray-800">
+                                        Calendario de Disponibilidad 2026-2027
+                                    </h1>
+                                    <p className="text-gray-600 mt-1">
+                                        {isAdmin ? (
+                                            <span>🔧 <span className="font-semibold text-blue-600">Modo Administrador</span></span>
+                                        ) : (
+                                            <span>👤 <span className="font-semibold">{personName}</span></span>
+                                        )}
+                                    </p>
+                                </div>
                                 <button
-                                    onClick={() => {
-                                        setIsAuthenticated(false);
-                                        setPersonName('');
-                                        setCode('');
-                                        setAvailability({});
-                                        setSelectedUser('');
-                                    }}
-                                    className="text-sm text-gray-600 hover:text-gray-800"
+                                    onClick={handleLogout}
+                                    className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                                 >
-                                    Cerrar sesión
+                                    🚪 Cerrar sesión
                                 </button>
                             </div>
 
-                            <div className="mb-6 bg-blue-50 rounded-lg p-4">
-                                <p className="text-sm text-gray-700">
-                                    <strong>Usuario:</strong> {personName}
-                                    {isAdmin && <span className="ml-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">ADMIN</span>}
-                                </p>
-                            </div>
-
                             {isAdmin && (
-                                <div className="mb-6 bg-purple-50 rounded-lg p-4">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Ver/Editar disponibilidad de:
+                                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <label className="block text-sm font-medium text-blue-900 mb-2">
+                                        🔧 Selecciona usuario para gestionar
                                     </label>
-                                    {useDropdown ? (
-                                        <div>
-                                            <select
-                                                value={selectedUser}
-                                                onChange={(e) => {
-                                                    setSelectedUser(e.target.value);
-                                                    if (e.target.value) {
-                                                        loadData();
-                                                    }
-                                                }}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                            >
-                                                <option value="">-- Selecciona un usuario --</option>
-                                                {personList.map(user => (
-                                                    <option key={user} value={user}>{user}</option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                onClick={() => setUseDropdown(false)}
-                                                className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-                                            >
-                                                → Escribir nombre manualmente
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <input
-                                                type="text"
-                                                value={selectedUser}
-                                                onChange={(e) => setSelectedUser(e.target.value)}
-                                                placeholder="Escribe el nombre completo"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                            />
-                                            <button
-                                                onClick={loadData}
-                                                className="mt-2 bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 mr-2"
-                                            >
-                                                Cargar datos
-                                            </button>
-                                            {personList.length > 0 && (
-                                                <button
-                                                    onClick={() => setUseDropdown(true)}
-                                                    className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-                                                >
-                                                    ← Volver a seleccionar de la lista
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
+                                    <select
+                                        value={personName}
+                                        onChange={handleAdminUserChange}
+                                        className="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                                        disabled={loading}
+                                    >
+                                        <option value="">-- Selecciona un usuario --</option>
+                                        {allUsers.map(user => (
+                                            <option key={user} value={user}>{user}</option>
+                                        ))}
+                                    </select>
+                                    <p className="mt-2 text-sm text-blue-700">
+                                        Como administrador, puedes ver y editar la disponibilidad de cualquier usuario
+                                    </p>
                                 </div>
                             )}
 
@@ -359,7 +424,7 @@
                                 </button>
                                 
                                 <h2 className="text-2xl font-bold text-gray-800">
-                                    {months[currentMonth]}
+                                    {months[currentMonth]} 2026
                                 </h2>
                                 
                                 <button
@@ -385,42 +450,66 @@
 
                             <div className="bg-gray-50 rounded-lg p-4 mb-6">
                                 <h3 className="font-semibold text-gray-700 mb-2">Leyenda:</h3>
-                                <div className="flex flex-wrap gap-4">
-                                    <div className="flex items-center">
-                                        <div className="w-6 h-6 bg-green-500 rounded mr-2"></div>
-                                        <span className="text-sm">Preferente</span>
-                                    </div>
+                                <div className="flex flex-wrap gap-4 text-sm">
                                     <div className="flex items-center">
                                         <div className="w-6 h-6 bg-red-500 rounded mr-2"></div>
-                                        <span className="text-sm">No disponible</span>
+                                        <span>No disponible (1 clic)</span>
                                     </div>
                                     <div className="flex items-center">
-                                        <div className="w-6 h-6 bg-gray-100 rounded mr-2 border"></div>
-                                        <span className="text-sm">Sin preferencia</span>
+                                        <div className="w-6 h-6 bg-green-500 rounded mr-2"></div>
+                                        <span>Disponible / Preferente (2 clics)</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="w-6 h-6 bg-gray-100 border border-gray-300 rounded mr-2"></div>
+                                        <span>Sin marcar</span>
                                     </div>
                                 </div>
+                                <p className="mt-2 text-xs text-gray-600">
+                                    Haz clic en un día para cambiar: Sin marcar → Rojo (1 clic) → Verde (2 clics) → Sin marcar (3 clics)
+                                </p>
                             </div>
 
-                            <div className="flex gap-4">
+                            <div className="flex gap-3">
                                 <button
-                                    onClick={saveData}
+                                    onClick={savePersonData}
                                     disabled={loading}
-                                    className="flex-1 bg-green-500 text-white py-3 px-6 rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                                    className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
                                 >
                                     {loading ? 'Guardando...' : '💾 Guardar Cambios'}
                                 </button>
+                                
+                                <button
+                                    onClick={deletePersonData}
+                                    disabled={loading}
+                                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                                >
+                                    🗑️ Eliminar todo
+                                </button>
                             </div>
-
-                            {message && (
-                                <div className={`mt-4 p-3 rounded-lg ${message.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                                    {message}
-                                </div>
-                            )}
                         </div>
 
-                        <div className="text-center text-sm text-gray-600">
-                            <p>Clica en cada día para marcar tu disponibilidad</p>
-                            <p className="mt-1"> 🔴 No disponible → 🟢 Preferente →⚪ Sin preferencia</p>
+                        <div className="bg-white rounded-2xl shadow-xl p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-3">
+                                {isAdmin ? 'Instrucciones (Administrador):' : 'Instrucciones:'}
+                            </h3>
+                            {isAdmin ? (
+                                <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                                    <li>Selecciona el usuario que quieres gestionar del desplegable</li>
+                                    <li>Marca en <span className="text-red-600 font-bold">rojo</span> los días que NO está disponible (1 clic)</li>
+                                    <li>Marca en <span className="text-green-600 font-bold">verde</span> los días que prefiere trabajar (2 clics)</li>
+                                    <li>Haz clic en "Guardar Cambios" para actualizar las preferencias</li>
+                                    <li>Puedes cambiar de usuario en cualquier momento</li>
+                                    <li>También puedes consultar la hoja "Vista Visual" en Google Sheets para ver todos los datos consolidados</li>
+                                </ol>
+                            ) : (
+                                <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                                    <li>Marca en <span className="text-red-600 font-bold">rojo</span> los días que NO estás disponible (1 clic)</li>
+                                    <li>Marca en <span className="text-green-600 font-bold">verde</span> los días que prefieres trabajar (2 clics)</li>
+                                    <li>Haz clic en "Guardar Cambios" para actualizar tus preferencias</li>
+                                    <li>Los datos se guardarán automáticamente en Google Sheets</li>
+                                    <li>Tus datos son privados y solo tú puedes verlos y editarlos</li>
+                                </ol>
+                            )}
                         </div>
                     </div>
                 </div>
