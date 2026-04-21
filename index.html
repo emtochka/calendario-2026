@@ -16,7 +16,7 @@
         const { useState, useEffect } = React;
 
         // ¡¡¡ATENCIÓN!!! - REEMPLAZA CON TU URL DE GOOGLE APPS SCRIPT
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8bGxLvQQPZuBE81fAZAH77ehBJNNOT_QmPFK2kCGx60DDzmmvenPHz-eKTtGJkB0TPg/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfOkom7A3--KjMNXKJBo00GyDDNLZEvAIr1KK4dhF9irVigrtW-832wa50uQZCP0LXig/exec';
 
         const CalendarioDisponibilidad = () => {
             const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -222,20 +222,10 @@
                     console.log('💾 Guardando datos para:', personName);
                     console.log('📊 Disponibilidad:', availability);
 
-                    const dataToSend = {
-                        action: 'saveData',
-                        name: personName,
-                        data: availability
-                    };
-
-                    const response = await fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(dataToSend)
-                    });
-
+                    // Usar GET en lugar de POST (evita problemas de CORS)
+                    const url = `${SCRIPT_URL}?action=saveData&name=${encodeURIComponent(personName)}&data=${encodeURIComponent(JSON.stringify(availability))}`;
+                    
+                    const response = await fetch(url);
                     const result = await response.json();
                     console.log('✅ Resultado del guardado:', result);
 
@@ -266,9 +256,8 @@
                 try {
                     console.log('🗑️ Eliminando datos para:', personName);
 
-                    const response = await fetch(`${SCRIPT_URL}?action=deleteData&name=${encodeURIComponent(personName)}`, {
-                        method: 'POST'
-                    });
+                    // Usar GET en lugar de POST
+                    const response = await fetch(`${SCRIPT_URL}?action=deleteData&name=${encodeURIComponent(personName)}`);
 
                     const result = await response.json();
                     console.log('✅ Resultado de eliminación:', result);
