@@ -16,7 +16,7 @@
         const { useState, useEffect } = React;
 
         // ¡¡¡ATENCIÓN!!! - REEMPLAZA CON TU URL DE GOOGLE APPS SCRIPT
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfD8aeV1uFV06JQMoS1TwL6uvqaEkD1mX2enrFMiQB8rt7VqHbsQEyNT_VCDIgVR4FVQ/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/TU_URL_AQUI/exec';
 
         // JSONP helper - evita CORS completamente
         const jsonpRequest = (params) => {
@@ -217,11 +217,18 @@
 
                 setLoading(true);
                 try {
-                    const result = await jsonpRequest({
-                        action: 'saveData',
-                        name: personName,
-                        data: JSON.stringify(availability)
+                    // POST para evitar URLs demasiado largas
+                    const formData = new FormData();
+                    formData.append('action', 'saveData');
+                    formData.append('name', personName);
+                    formData.append('data', JSON.stringify(availability));
+
+                    const response = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: formData
                     });
+
+                    const result = await response.json();
 
                     if (result.success) {
                         alert('✅ Datos guardados correctamente');
