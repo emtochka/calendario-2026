@@ -54,6 +54,10 @@
             const [availability, setAvailability] = useState({});
             const [loading, setLoading] = useState(false);
 
+            // Bloqueo de meses por rango: -1 = ninguno, 0 = enero 2026, ..., 12 = enero 2027
+            const [lockUntilMonth, setLockUntilMonth] = useState(-1);
+            const [savingLocks, setSavingLocks] = useState(false);
+
             const months = [
                 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
@@ -71,6 +75,8 @@
                     setIsAdmin(savedIsAdmin);
                     setIsAuthenticated(true);
                     
+                    loadLockedMonths();
+
                     if (savedIsAdmin) {
                         loadAllUsers();
                     } else {
@@ -98,7 +104,30 @@
                 return `${year}-${String(actualMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             };
 
+            // Convierte una fecha "YYYY-MM-DD" al índice de mes 0..12 (12 = enero 2027)
+            const dateToMonthIndex = (dateString) => {
+                const year = parseInt(dateString.substring(0, 4));
+                const month = parseInt(dateString.substring(5, 7)) - 1;
+                if (year === 2026) return month;
+                if (year === 2027 && month === 0) return 12;
+                return -1;
+            };
+
+            const isMonthLocked = (monthIndex) => {
+                return monthIndex >= 0 && monthIndex <= lockUntilMonth;
+            };
+
+            const isDateLocked = (dateString) => {
+                const idx = dateToMonthIndex(dateString);
+                return isMonthLocked(idx);
+            };
+
             const handleDayClick = (dateString) => {
+                // Usuarios normales no pueden modificar días de meses bloqueados
+                if (isDateLocked(dateString) && !isAdmin) {
+                    return;
+                }
+
                 setAvailability(prev => {
                     const current = prev[dateString] || 'neutral';
                     const next = current === 'neutral' ? 'unavailable' : 
@@ -116,9 +145,21 @@
 
             const getDayColor = (dateString) => {
                 const status = availability[dateString] || 'neutral';
-                if (status === 'available') return 'bg-green-500 text-white';
-                if (status === 'unavailable') return 'bg-red-500 text-white';
-                return 'bg-gray-100 hover:bg-gray-200';
+                const locked = isDateLocked(dateString) && !isAdmin;
+
+                if (status === 'available') {
+                    return locked
+                        ? 'bg-green-500 text-white opacity-60 cursor-not-allowed'
+                        : 'bg-green-500 text-white';
+                }
+                if (status === 'unavailable') {
+                    return locked
+                        ? 'bg-red-500 text-white opacity-60 cursor-not-allowed'
+                        : 'bg-red-500 text-white';
+                }
+                return locked
+                    ? 'bg-gray-200 cursor-not-allowed opacity-60'
+                    : 'bg-gray-100 hover:bg-gray-200';
             };
 
             const handleLogin = async () => {
@@ -142,6 +183,8 @@
                         localStorage.setItem('userCode', codeInput.trim());
                         localStorage.setItem('userName', result.name);
                         localStorage.setItem('isAdmin', result.isAdmin || false);
+
+                        await loadLockedMonths();
 
                         if (result.isAdmin) {
                             await loadAllUsers();
@@ -167,6 +210,7 @@
                 setPersonName('');
                 setAllUsers([]);
                 setAvailability({});
+                setLockUntilMonth(-1);
                 localStorage.clear();
             };
 
@@ -181,6 +225,21 @@
                 }
             };
 
+            const loadLockedMonths = async () => {
+                try {
+                    const result = await jsonpRequest({ action: 'getLockedMonths' });
+                    if (result.success) {
+                        setLockUntilMonth(
+                            result.lockUntilMonth !== undefined && result.lockUntilMonth !== null
+                                ? result.lockUntilMonth
+                                : -1
+                        );
+                    }
+                } catch (error) {
+                    console.error('Error al cargar meses bloqueados:', error);
+                }
+            };
+
             const handleAdminUserChange = async (e) => {
                 const selectedUser = e.target.value;
                 setPersonName(selectedUser);
@@ -188,6 +247,26 @@
                     await loadPersonData(selectedUser);
                 } else {
                     setAvailability({});
+                }
+            };
+
+            const handleLockUntilChange = async (e) => {
+                const newValue = parseInt(e.target.value);
+                setSavingLocks(true);
+                try {
+                    const result = await jsonpRequest({
+                        action: 'setLockedMonths',
+                        monthIndex: newValue
+                    });
+                    if (result.success) {
+                        setLockUntilMonth(newValue);
+                    } else {
+                        alert('Error al actualizar bloqueo: ' + (result.message || ''));
+                    }
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                } finally {
+                    setSavingLocks(false);
                 }
             };
 
@@ -217,7 +296,6 @@
 
                 setLoading(true);
                 try {
-                    // POST para evitar URLs demasiado largas
                     const formData = new FormData();
                     formData.append('action', 'saveData');
                     formData.append('name', personName);
@@ -327,6 +405,8 @@
                 );
             }
 
+            const currentMonthLocked = isMonthLocked(currentMonth);
+
             return (
                 <div className="min-h-screen bg-gray-50 p-4">
                     <div className="max-w-4xl mx-auto">
@@ -362,6 +442,29 @@
                                 </div>
                             )}
 
+                            {isAdmin && (
+                                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                                    <label className="block text-sm font-medium mb-2">
+                                        🔒 Bloquear meses hasta (incluido):
+                                    </label>
+                                    <select
+                                        value={lockUntilMonth}
+                                        onChange={handleLockUntilChange}
+                                        disabled={savingLocks}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value={-1}>Ningún mes bloqueado</option>
+                                        {months.map((m, idx) => (
+                                            <option key={idx} value={idx}>Hasta {m} (incluido)</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        Los usuarios no podrán modificar enero 2026 hasta el mes seleccionado.
+                                        {savingLocks && ' Guardando...'}
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="flex items-center justify-between mb-4">
                                 <button
                                     onClick={() => setCurrentMonth(Math.max(0, currentMonth - 1))}
@@ -379,6 +482,18 @@
                                     Siguiente →
                                 </button>
                             </div>
+
+                            {currentMonthLocked && (
+                                <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 rounded text-yellow-800 text-sm flex items-center gap-2">
+                                    <span>🔒</span>
+                                    <span>
+                                        <strong>Mes bloqueado:</strong>{' '}
+                                        {isAdmin
+                                            ? 'puedes editar como admin.'
+                                            : 'no puedes modificar este mes mientras se asignan las guardias.'}
+                                    </span>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-7 gap-2 mb-4">
                                 {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
